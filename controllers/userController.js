@@ -5,15 +5,30 @@ const bcrypt = require('bcrypt');
 // It receives the request and response as parameters
 exports.getUser = (req, res) => {
     const { email, password } = req.body;
-    connection.query("SELECT NAME FROM TB_USER WHERE EMAIL = ? AND PASSWORD = ?", [email, password], (err, result) => {
+    if (!email || !password) { // Check if email and password are filled in
+        return res.status(400).send("Email and password are required");
+    }
+
+    connection.query("SELECT NAME, PASSWORD FROM TB_USER WHERE EMAIL = ?", [ email ], (err, result) => {
         if (err) {
             return res.status(500).send("Error retrieving data from database");
         }
         if (result.length === 0) {
-            return res.status(404).send("User not found or incorrect email/password");
+            return res.status(404).send("User not found");
         }
-        return res.status(200).send(result);
-    })
+        const hashedPassword = result[0].PASSWORD; // Get the hashed password from the database
+
+        // Compare the password entered with the hashed password in the database
+        bcrypt.compare(password, hashedPassword, (err, match) => {
+            if (err) {
+                return res.status(500).send("Error comparing passwords" + err);
+            }
+            if (!match) {
+                return res.status(401).send("Incorrect password");
+            }
+            return res.status(200).json({message: "User successfully authenticated", userName: result[0].NAME});
+        });
+    });
 }
 
 // This function is responsible for inserting a new user into the database
