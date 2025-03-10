@@ -9,7 +9,7 @@ exports.getUser = (req, res) => {
         return res.status(400).send("Email and password are required");
     }
 
-    connection.query("SELECT NAME, PASSWORD FROM TB_USER WHERE EMAIL = ?", [ email ], (err, result) => {
+    connection.query("SELECT NAME, PASSWORD FROM TB_USER WHERE EMAIL = ?", [email], (err, result) => {
         if (err) {
             return res.status(500).send("Error retrieving data from database");
         }
@@ -26,7 +26,7 @@ exports.getUser = (req, res) => {
             if (!match) {
                 return res.status(401).send("Incorrect password");
             }
-            return res.status(200).json({message: "User successfully authenticated", userName: result[0].NAME});
+            return res.status(200).json({ message: "User successfully authenticated", userName: result[0].NAME });
         });
     });
 }
@@ -35,11 +35,24 @@ exports.getUser = (req, res) => {
 // It receives the request and response as parameters
 exports.insertUser = (req, res) => {
     const { name, email, phone, birth, password } = req.body;
+    if (!name || !email || !phone || !birth || !password) { // Check if all fields are filled in
+        return res.status(400).send("All fields are required to insert");
+    }
+    const hashedPassword = bcrypt.hashSync(password, 10) // Hash the password
     const [day, month, year] = birth.split("/");
-    const newBirth = `${year}-${month}-${day}`;
-    connection.query("INSERT INTO TB_USER (NAME, EMAIL, PHONE, BIRTH, PASSWORD) VALUES (?, ?, ?, ?, ?)", [name, email, phone, newBirth, password], (err, result) => {
+    const formattedBirth = `${year}-${month}-${day}`;
+    connection.query("INSERT INTO TB_USER (NAME, EMAIL, PHONE, BIRTH, PASSWORD) VALUES (?, ?, ?, ?, ?)", [name, email, phone, formattedBirth, hashedPassword], (err, result) => {
         if (err) {
-            return res.status(500).send("Error inserting data into database");
+            if (err.message.includes("Duplicate entry") && err.message.includes("email")) { // Check if the error is due to duplicate email entry
+                return res.status(409).send("Email already registered");
+            }
+            if (err.message.includes("Duplicate entry") && err.message.includes("telefone")) { // Check if the error is due to duplicate phone number entry
+                return res.status(409).send("Phone number already registered");
+            }
+            if (err.message.includes("Incorrect date value")) { // Check if the error is due to an invalid date
+                return res.status(400).send("Invalid date format! Use dd/mm/yyyy");
+            }
+            return res.status(500).send("Error inserting data into database" + err);
         }
         return res.status(201).send("User successfully inserted");
     })
@@ -53,13 +66,13 @@ exports.updateUser = (req, res) => {
         return res.status(400).send("Email and password are required to update");
     }
     const { name, phone, birth, newEmail, newPassword } = req.body;
-    const updates = { name, phone, email:newEmail }; // Create an object with the fields to be updated
+    const updates = { name, phone, email: newEmail }; // Create an object with the fields to be updated
     // Check if the birth date is filled in
     if (birth) {
         const [day, month, year] = birth.split("/");
         updates.birth = `${year}-${month}-${day}`; // Change the date format and add it to the updates object
     }
-    connection.query("SELECT ID_TB_USER, PASSWORD FROM TB_USER WHERE EMAIL = ?", [ email ], (err, result) => {
+    connection.query("SELECT ID_TB_USER, PASSWORD FROM TB_USER WHERE EMAIL = ?", [email], (err, result) => {
         if (err) {
             return res.status(500).send("Error retrieving data from database");
         }
@@ -73,7 +86,7 @@ exports.updateUser = (req, res) => {
         if (newEmail && newEmail !== currentEmail) { // Check if the email is different from the current one
             updates.email = newEmail; // Add the new email to the updates object
         }
-        
+
         bcrypt.compare(password, hashedPassword, (err, match) => {
             if (err) {
                 return res.status(500).send("Error comparing passwords" + err);
@@ -94,7 +107,7 @@ exports.updateUser = (req, res) => {
                 updateDatabase(userId, updates, res); // Call the function to update the database
             }
 
-        }) 
+        })
     });
 }
 // Function to update the database
