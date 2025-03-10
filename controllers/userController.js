@@ -1,7 +1,7 @@
 const connection = require('../config/db');
 const bcrypt = require('bcrypt');
 
-// This function is responsible for retrieving the user from the database
+// This function is responsible for retrieving the user name from the database
 // It receives the request and response as parameters
 exports.getUser = (req, res) => {
     const { email, password } = req.body;
@@ -110,6 +110,40 @@ exports.updateUser = (req, res) => {
         })
     });
 }
+
+// This function is responsible for deleting a user from the database
+exports.deleteUser = (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) { // Check if email and password are filled in
+        return res.status(400).send("Email and password are required to delete user");
+    }
+    connection.query("SELECT ID_TB_USER, PASSWORD FROM TB_USER WHERE EMAIL = ?", [ email ], (err, result) => {
+        if (err) {
+            return res.status(500).send("Error retrieving data from database");
+        }
+        if (result.length === 0) {
+            return res.status(404).send("User not found or incorrect email/password");
+        }
+        const userId = result[0].ID_TB_USER; // Get the user ID
+        const currentPassword = result[0].PASSWORD; // Get the current password
+
+        bcrypt.compare(password, currentPassword, (err, match) => {
+            if (err) {
+                return res.status(500).send("Error comparing passwords" + err);
+            }
+            if (!match) {
+                return res.status(401).send("Invalid email/password");
+            }
+            connection.query("DELETE FROM TB_USER WHERE ID_TB_USER = ?", [userId], (err, result) => {
+                if (err) {
+                    return res.status(500).send("Error deleting user from database");
+                }
+                return res.status(200).send("User successfully deleted");
+            });
+        });
+    });
+}
+
 // Function to update the database
 function updateDatabase(userId, updates, res) {
 
