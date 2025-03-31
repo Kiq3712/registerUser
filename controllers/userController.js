@@ -31,6 +31,32 @@ exports.getUser = (req, res) => {
     });
 }
 
+
+// This function is responsible for retrieving all users from the database
+exports.getAll = (req, res) => {
+    connection.query("SELECT * FROM TB_USER", (err, result) => {
+        if (err) {
+            return res.status(500).json({ error: "Error retrieving data from database" });
+        }
+        if (result.length === 0) {
+            return res.status(404).json({ message: "No users found" });
+        }
+
+        // Format the birth date to dd/mm/yyyy
+        const formattedResult = result.map(user => {
+            if (user.birth) {
+                const day = String(user.birth.getDate()).padStart(2, '0'); // Get the day and format it to 2 digits
+                const month = String(user.birth.getMonth() + 1).padStart(2, '0'); // Get the month and format it to 2 digits
+                const year = user.birth.getFullYear(); // Get the year
+                user.birth = `${day}/${month}/${year}`; // Format the date to dd/mm/yyyy
+            }
+            return user;
+        });
+
+        return res.status(200).json( formattedResult ); // Return the list of users
+    })
+}
+
 // This function is responsible for inserting a new user into the database
 // It receives the request and response as parameters
 exports.insertUser = (req, res) => {
